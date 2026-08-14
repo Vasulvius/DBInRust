@@ -1,0 +1,9 @@
+[package]
+name = "minidb"
+version = "0.1.0"
+edition = "2024"
+
+# Règle du jeu : zéro dépendance. Tout se fait avec la bibliothèque standard.
+# On introduira peut-être une crate ou deux plus tard, mais seulement après
+# avoir écrit à la main ce qu'elles remplacent — sinon tu n'apprends rien.
+[dependencies]
