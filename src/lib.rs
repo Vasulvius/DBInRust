@@ -5,4 +5,5 @@
 //! moteur testable : les tests d'intégration de `tests/` ne peuvent voir que
 //! ce qui est exposé ici.
 
+pub mod lexer;
 pub mod repl;

@@ -46,4 +46,23 @@ transactions et journal, index secondaires, jointures.
 
 ## État
 
-- [ ] Étape 1 — REPL
+- [x] **Étape 1 — REPL** (commit `006d2d9`)
+      `classify` trie une ligne en méta-commande / SQL / vide, et `main.rs`
+      fait tourner la boucle avec prompt, Ctrl-D et erreurs sur `stderr`.
+      Au passage : le shadowing plutôt que `mut` sur un paramètre, les
+      or-patterns dans un `match`, le tamponnage de `stdout` et pourquoi
+      `flush()` existe, le type `!` de `break` et `panic!`.
+- [ ] **Étape 2 — Tokenizer** ← en cours
+      Spec dans `src/lexer.rs`, tests dans `tests/lexer.rs` (25 cas).
+
+## Dettes assumées
+
+Choses volontairement laissées de côté, à reprendre quand le besoin sera réel —
+plutôt que de sur-concevoir maintenant.
+
+| Quoi                                            | Prévu pour |
+|-------------------------------------------------|------------|
+| Positions dans le source pour les erreurs        | étape 4    |
+| Nombres négatifs, flottants, commentaires `--`   | au besoin  |
+| Identifiants entre guillemets (`"ma table"`)     | au besoin  |
+| Arguments de méta-commandes (`.exit 0`)          | au besoin  |
