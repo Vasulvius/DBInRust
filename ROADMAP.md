@@ -61,7 +61,9 @@ transactions et journal, index secondaires, jointures.
       un **opérateur** qui fait passer une expression de `Result<T, E>` à `T`,
       les gardes dans un `match`, et pourquoi un double emballage
       `Option<Result<_, _>>` est le symptôme d'un dispatcher qui ne tranche pas.
-- [ ] **Étape 3 — Parser** ← à venir
+- [ ] **Étape 3 — Parser** ← en cours
+      Grammaire et types dans `src/parser.rs`, tests dans `tests/parser.rs`
+      (30 cas). `parse(sql: &str) -> Result<Statement, ParseError>`.
 
 ## Dettes assumées
 

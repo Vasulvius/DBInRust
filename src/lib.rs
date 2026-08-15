@@ -6,4 +6,5 @@
 //! ce qui est exposé ici.
 
 pub mod lexer;
+pub mod parser;
 pub mod repl;
