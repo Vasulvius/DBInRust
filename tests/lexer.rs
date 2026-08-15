@@ -100,7 +100,9 @@ fn les_entiers_sont_convertis() {
 fn un_entier_trop_grand_est_une_erreur() {
     assert_eq!(
         tokenize("99999999999999999999"),
-        Err(LexError::NumberOutOfRange("99999999999999999999".to_string()))
+        Err(LexError::NumberOutOfRange(
+            "99999999999999999999".to_string()
+        ))
     );
 }
 
@@ -153,10 +155,7 @@ fn les_operateurs_a_un_caractere() {
 
 #[test]
 fn les_operateurs_a_deux_caracteres() {
-    assert_eq!(
-        tokenize("<= >= != <>"),
-        Ok(vec![LtEq, GtEq, NotEq, NotEq])
-    );
+    assert_eq!(tokenize("<= >= != <>"), Ok(vec![LtEq, GtEq, NotEq, NotEq]));
 }
 
 #[test]
@@ -164,6 +163,14 @@ fn un_operateur_ne_mange_pas_le_token_suivant() {
     assert_eq!(tokenize("<5"), Ok(vec![Lt, Int(5)]));
     assert_eq!(tokenize(">=x"), Ok(vec![GtEq, ident("x")]));
     assert_eq!(tokenize("<>="), Ok(vec![NotEq, Eq]));
+}
+
+#[test]
+fn un_operateur_peut_terminer_lentree() {
+    // Il n'y a plus rien à regarder après : ce sont les formes courtes.
+    assert_eq!(tokenize("<"), Ok(vec![Lt]));
+    assert_eq!(tokenize(">"), Ok(vec![Gt]));
+    assert_eq!(tokenize("id ="), Ok(vec![ident("id"), Eq]));
 }
 
 // --- erreurs ----------------------------------------------------------------
@@ -179,6 +186,10 @@ fn un_caractere_inconnu_est_une_erreur() {
 #[test]
 fn un_point_dexclamation_seul_est_une_erreur() {
     assert_eq!(tokenize("a ! b"), Err(LexError::UnexpectedChar('!')));
+    assert_eq!(tokenize("!x"), Err(LexError::UnexpectedChar('!')));
+    // Un `!` en toute fin d'entrée : il n'y a pas de `=` derrière non plus.
+    assert_eq!(tokenize("!"), Err(LexError::UnexpectedChar('!')));
+    assert_eq!(tokenize("a !"), Err(LexError::UnexpectedChar('!')));
 }
 
 // --- requêtes complètes -----------------------------------------------------

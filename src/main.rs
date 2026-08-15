@@ -1,5 +1,3 @@
-//! Point d'entrée : la boucle interactive.
-
 use std::io::{self, Write};
 
 use minidb::repl::{Input, MetaCommand, classify};

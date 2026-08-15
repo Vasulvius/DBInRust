@@ -1,84 +1,188 @@
-//! Étape 2 — analyse lexicale : découper du SQL brut en tokens.
-//!
-//! Le tokenizer ne comprend rien à la grammaire SQL. Il ne sait pas qu'un
-//! `SELECT` doit être suivi de colonnes, ni qu'une parenthèse ouverte doit se
-//! refermer : c'est le travail du parser, à l'étape 3. Ici on ne fait qu'une
-//! chose — transformer une suite de caractères en une suite de **mots**
-//! classés. `select*from t` et `SELECT * FROM t` doivent produire exactement
-//! la même sortie.
-//!
-//! # À écrire dans ce fichier
-//!
-//! ```text
-//! pub enum Keyword    // les mots réservés du langage
-//! pub enum Token      // un mot classé
-//! pub enum LexError   // ce qui peut mal se passer
-//! pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError>
-//! ```
-//!
-//! ## `Keyword`
-//!
-//! Douze variantes sans donnée associée :
-//! `Select`, `From`, `Where`, `Insert`, `Into`, `Values`, `Create`, `Table`,
-//! `And`, `Or`, `Integer`, `Text`.
-//!
-//! ## `Token`
-//!
-//! | Variante          | Donnée   | Ce que ça représente          |
-//! |-------------------|----------|-------------------------------|
-//! | `Keyword`         | `Keyword`| un mot réservé                |
-//! | `Ident`           | `String` | un nom de table ou de colonne |
-//! | `Int`             | `i64`    | un littéral entier            |
-//! | `Str`             | `String` | un littéral chaîne            |
-//! | `Comma`           | —        | `,`                           |
-//! | `Semicolon`       | —        | `;`                           |
-//! | `LParen`          | —        | `(`                           |
-//! | `RParen`          | —        | `)`                           |
-//! | `Star`            | —        | `*`                           |
-//! | `Eq`              | —        | `=`                           |
-//! | `NotEq`           | —        | `!=` et `<>`                  |
-//! | `Lt` / `LtEq`     | —        | `<` et `<=`                   |
-//! | `Gt` / `GtEq`     | —        | `>` et `>=`                   |
-//!
-//! ## `LexError`
-//!
-//! - `UnexpectedChar(char)` — un caractère qui n'a rien à faire là
-//! - `UnterminatedString` — une apostrophe ouverte jamais refermée
-//! - `NumberOutOfRange(String)` — des chiffres qui ne tiennent pas dans un `i64`
-//!
-//! # Les règles
-//!
-//! - **Espaces** (espace, tabulation, retour à la ligne) : ignorés, ils ne
-//!   servent qu'à séparer. Ils ne sont pas obligatoires : `id=1` donne trois
-//!   tokens.
-//! - **Mots** : commencent par une lettre ou `_`, continuent avec des lettres,
-//!   des chiffres ou des `_`. Si le mot complet correspond à un mot réservé
-//!   (sans tenir compte de la casse), c'est un `Keyword` ; sinon un `Ident`,
-//!   dont on **conserve la casse d'origine**. Attention : `selection` n'est pas
-//!   `SELECT` suivi de `ion`.
-//! - **Entiers** : une suite de chiffres. Convertis en `i64` — et cette
-//!   conversion peut échouer.
-//! - **Chaînes** : entre apostrophes simples. Une apostrophe à l'intérieur
-//!   s'écrit en la doublant, comme en SQL : `'it''s'` contient `it's`. Le
-//!   contenu n'est jamais interprété — `'select'` est une chaîne, pas un
-//!   mot-clé.
-//! - **Opérateurs à deux caractères** : `<=`, `>=`, `!=`, `<>`. C'est le cœur
-//!   de l'exercice — en voyant `<`, tu dois regarder le caractère suivant
-//!   **sans le consommer** pour savoir si tu tiens `Lt` ou `LtEq`. Un `!` qui
-//!   n'est pas suivi de `=` est une erreur.
-//! - Tout le reste est un `UnexpectedChar`.
-//!
-//! # Hors périmètre (volontairement)
-//!
-//! Pas de nombres négatifs (`-` n'est pas reconnu), pas de flottants, pas de
-//! commentaires `--`, pas d'identifiants entre guillemets. On ajoutera au fur
-//! et à mesure des besoins du parser.
-//!
-//! Les positions dans le texte source n'y sont pas non plus : `UnexpectedChar`
-//! dit *quoi*, pas *où*. On les ajoutera à l'étape 4, quand on unifiera les
-//! erreurs du moteur — tu verras alors ce que coûte un type d'erreur qu'on
-//! enrichit après coup.
-//!
-//! # Comment savoir si c'est bon
-//!
-//! `cargo test`. La spécification exécutable est dans `tests/lexer.rs`.
+use std::{iter::Peekable, str::Chars};
+
+pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
+    Lexer::new(src).tokenize()
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Keyword {
+    Select,
+    From,
+    Where,
+    Insert,
+    Into,
+    Values,
+    Create,
+    Table,
+    And,
+    Or,
+    Integer,
+    Text,
+}
+
+impl Keyword {
+    fn create(src: &str) -> Option<Keyword> {
+        match src.to_ascii_lowercase().as_str() {
+            "select" => Some(Keyword::Select),
+            "from" => Some(Keyword::From),
+            "where" => Some(Keyword::Where),
+            "insert" => Some(Keyword::Insert),
+            "into" => Some(Keyword::Into),
+            "values" => Some(Keyword::Values),
+            "create" => Some(Keyword::Create),
+            "table" => Some(Keyword::Table),
+            "and" => Some(Keyword::And),
+            "or" => Some(Keyword::Or),
+            "integer" => Some(Keyword::Integer),
+            "text" => Some(Keyword::Text),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Token {
+    Keyword(Keyword),
+    Ident(String),
+    Int(i64),
+    Str(String),
+    Comma,
+    Semicolon,
+    LParen,
+    RParen,
+    Star,
+    Eq,
+    NotEq,
+    Lt,
+    LtEq,
+    Gt,
+    GtEq,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum LexError {
+    UnexpectedChar(char),
+    UnterminatedString,
+    NumberOutOfRange(String),
+}
+
+struct Lexer<'a> {
+    chars: Peekable<Chars<'a>>,
+}
+
+impl<'a> Lexer<'a> {
+    fn new(src: &'a str) -> Self {
+        Lexer {
+            chars: src.chars().peekable(),
+        }
+    }
+
+    fn tokenize(&mut self) -> Result<Vec<Token>, LexError> {
+        let mut tokens: Vec<Token> = Vec::new();
+        while let Some(&c) = self.chars.peek() {
+            match c {
+                _ if c.is_ascii_whitespace() => {
+                    self.chars.next();
+                }
+                _ if c.is_ascii_digit() => tokens.push(self.tokenize_number()?),
+                _ if c.is_ascii_alphabetic() || c == '_' => {
+                    tokens.push(self.tokenize_ident_or_keyword())
+                }
+                '\'' => tokens.push(self.tokenize_string()?),
+                _ => tokens.push(self.tokenize_symbol(c)?),
+            }
+        }
+        Ok(tokens)
+    }
+
+    fn tokenize_number(&mut self) -> Result<Token, LexError> {
+        let nb = self.take_while(|c| c.is_ascii_digit());
+        match nb.parse::<i64>() {
+            Ok(parsed_nb) => Ok(Token::Int(parsed_nb)),
+            Err(_) => Err(LexError::NumberOutOfRange(nb)),
+        }
+    }
+
+    fn tokenize_ident_or_keyword(&mut self) -> Token {
+        let expression = self.take_while(|c| c.is_ascii_alphanumeric() || c == '_');
+        match Keyword::create(&expression) {
+            Some(keyword) => Token::Keyword(keyword),
+            None => Token::Ident(expression),
+        }
+    }
+
+    fn take_while(&mut self, pred: impl Fn(char) -> bool) -> String {
+        let mut expression = String::new();
+        while let Some(&c) = self.chars.peek() {
+            if pred(c) {
+                expression.push(c);
+                self.chars.next();
+            } else {
+                break;
+            }
+        }
+        expression
+    }
+
+    fn tokenize_string(&mut self) -> Result<Token, LexError> {
+        let mut str_data = String::new();
+        self.chars.next();
+        while let Some(c) = self.chars.next() {
+            if c == '\'' {
+                if self.eat('\'') {
+                    str_data.push('\'');
+                } else {
+                    return Ok(Token::Str(str_data));
+                }
+            } else {
+                str_data.push(c);
+            }
+        }
+        Err(LexError::UnterminatedString)
+    }
+
+    fn tokenize_symbol(&mut self, c: char) -> Result<Token, LexError> {
+        self.chars.next();
+        match c {
+            '=' => Ok(Token::Eq),
+            ',' => Ok(Token::Comma),
+            ';' => Ok(Token::Semicolon),
+            '(' => Ok(Token::LParen),
+            ')' => Ok(Token::RParen),
+            '*' => Ok(Token::Star),
+            '!' => {
+                if self.eat('=') {
+                    Ok(Token::NotEq)
+                } else {
+                    Err(LexError::UnexpectedChar('!'))
+                }
+            }
+            '<' => {
+                if self.eat('>') {
+                    Ok(Token::NotEq)
+                } else if self.eat('=') {
+                    Ok(Token::LtEq)
+                } else {
+                    Ok(Token::Lt)
+                }
+            }
+            '>' => {
+                if self.eat('=') {
+                    Ok(Token::GtEq)
+                } else {
+                    Ok(Token::Gt)
+                }
+            }
+            _ => Err(LexError::UnexpectedChar(c)),
+        }
+    }
+
+    fn eat(&mut self, expected: char) -> bool {
+        if Some(&expected) == self.chars.peek() {
+            self.chars.next();
+            true
+        } else {
+            false
+        }
+    }
+}

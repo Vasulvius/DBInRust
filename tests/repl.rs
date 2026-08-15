@@ -1,8 +1,3 @@
-//! Étape 1 — tests d'acceptation de `classify`.
-//!
-//! Ce fichier est la spécification exécutable de l'étape. Tu ne le modifies
-//! pas : tu écris `src/repl.rs` jusqu'à ce que `cargo test` soit vert.
-
 use minidb::repl::{Input, MetaCommand, classify};
 
 // --- méta-commandes ---------------------------------------------------------

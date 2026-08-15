@@ -52,8 +52,16 @@ transactions et journal, index secondaires, jointures.
       Au passage : le shadowing plutôt que `mut` sur un paramètre, les
       or-patterns dans un `match`, le tamponnage de `stdout` et pourquoi
       `flush()` existe, le type `!` de `break` et `panic!`.
-- [ ] **Étape 2 — Tokenizer** ← en cours
-      Spec dans `src/lexer.rs`, tests dans `tests/lexer.rs` (25 cas).
+- [x] **Étape 2 — Tokenizer**
+      `tokenize` découpe le SQL en `Vec<Token>` ; un dispatcher à cinq bras où
+      chaque classe de caractère délègue à une méthode qui consomme ce qu'elle
+      prend. Seuls les espaces sont consommés en ligne — et ils ne produisent
+      aucun token.
+      Au passage : `Peekable` et le `peek` sans consommation, `?` compris comme
+      un **opérateur** qui fait passer une expression de `Result<T, E>` à `T`,
+      les gardes dans un `match`, et pourquoi un double emballage
+      `Option<Result<_, _>>` est le symptôme d'un dispatcher qui ne tranche pas.
+- [ ] **Étape 3 — Parser** ← à venir
 
 ## Dettes assumées
 
