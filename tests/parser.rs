@@ -398,7 +398,10 @@ fn une_entree_vide_est_une_erreur() {
 #[test]
 fn une_requete_tronquee_est_une_erreur() {
     assert_eq!(parse("SELECT * FROM"), Err(ParseError::UnexpectedEnd));
-    assert_eq!(parse("SELECT * FROM t WHERE"), Err(ParseError::UnexpectedEnd));
+    assert_eq!(
+        parse("SELECT * FROM t WHERE"),
+        Err(ParseError::UnexpectedEnd)
+    );
     assert_eq!(parse("CREATE TABLE t ("), Err(ParseError::UnexpectedEnd));
     assert_eq!(parse("INSERT INTO t"), Err(ParseError::UnexpectedEnd));
 }
