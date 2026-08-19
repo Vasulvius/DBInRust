@@ -115,7 +115,7 @@
 //! dérivation à `Token`. Si ça arrive, le compilateur te dira laquelle et
 //! pourquoi — lis son message, il y a une décision de conception derrière.
 
-use std::{iter::Peekable, println, vec::IntoIter};
+use std::{iter::Peekable, matches, println, vec::IntoIter};
 
 use crate::lexer::{Keyword, LexError, Token, tokenize};
 
@@ -214,13 +214,12 @@ impl Parser {
     }
 
     fn parse(&mut self) -> Result<Statement, ParseError> {
-        let statement: Statement;
-        match self.next()? {
-            Token::Keyword(Keyword::Create) => statement = self.parse_create_table()?,
-            Token::Keyword(Keyword::Insert) => statement = self.parse_insert()?,
-            Token::Keyword(Keyword::Select) => statement = self.parse_select()?,
+        let statement = match self.next()? {
+            Token::Keyword(Keyword::Create) => self.parse_create_table()?,
+            Token::Keyword(Keyword::Insert) => self.parse_insert()?,
+            Token::Keyword(Keyword::Select) => self.parse_select()?,
             token => return Err(ParseError::UnexpectedToken(token)),
-        }
+        };
         match self.tokens.next() {
             Some(Token::Semicolon) => match self.tokens.next() {
                 Some(token) => Err(ParseError::UnexpectedToken(token)),
@@ -309,14 +308,6 @@ impl Parser {
             Token::Gt => Ok(CompareOp::Gt),
             Token::GtEq => Ok(CompareOp::GtEq),
             token => Err(ParseError::UnexpectedToken(token)),
-        }
-    }
-
-    fn eat_compare_op(&mut self) -> bool {
-        match self.tokens.peek() {
-            Some(Token::Eq) | Some(Token::NotEq) | Some(Token::Lt) | Some(Token::LtEq)
-            | Some(Token::Gt) | Some(Token::GtEq) => true,
-            _ => false,
         }
     }
 
@@ -464,28 +455,31 @@ impl Parser {
     fn compare_expr(&mut self) -> Result<Box<Expr>, ParseError> {
         if self.eat(Token::LParen) {
             let mut expr = self.compare_expr();
-            println!("{:?}", expr);
             if Some(&Token::Keyword(Keyword::Or)) == self.tokens.peek() {
                 expr = self.or_expr(Some(expr?));
-                println!("{:?}", expr);
             }
-            println!("Coucou");
             self.expect(Token::RParen)?;
             return expr;
         }
 
         let col = Expr::Column(self.ident()?);
 
-        if self.eat_compare_op() {
+        if matches!(
+            self.tokens.peek(),
+            Some(Token::Eq)
+                | Some(Token::NotEq)
+                | Some(Token::Lt)
+                | Some(Token::LtEq)
+                | Some(Token::Gt)
+                | Some(Token::GtEq)
+        ) {
             let left = Box::new(col);
             let op = self.expect_compare_op()?;
-            let right: Box<Expr>;
-
-            match self.next()? {
-                Token::Str(s) => right = Box::new(Expr::Literal(Value::Str(s))),
-                Token::Int(n) => right = Box::new(Expr::Literal(Value::Int(n))),
+            let right: Box<Expr> = match self.next()? {
+                Token::Str(s) => Box::new(Expr::Literal(Value::Str(s))),
+                Token::Int(n) => Box::new(Expr::Literal(Value::Int(n))),
                 token => return Err(ParseError::UnexpectedToken(token)),
-            }
+            };
 
             Ok(Box::new(Expr::Compare { left, op, right }))
         } else {
