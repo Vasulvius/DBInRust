@@ -367,6 +367,73 @@ fn une_comparaison_peut_se_reduire_a_un_seul_terme() {
     );
 }
 
+#[test]
+fn un_and_entre_parentheses_est_regroupe() {
+    // Le pendant du test précédent : c'est le AND qui est isolé cette fois.
+    // Sans parenthèses, `a = 1 AND b = 2 OR c = 3` donnerait le même arbre,
+    // mais le parser doit savoir traiter les deux opérateurs dans une
+    // parenthèse, pas seulement le OR.
+    assert_eq!(
+        parse("SELECT * FROM t WHERE (a = 1 AND b = 2) OR c = 3"),
+        Ok(select(
+            Selection::All,
+            "t",
+            Some(or(
+                and(
+                    cmp(col("a"), CompareOp::Eq, int(1)),
+                    cmp(col("b"), CompareOp::Eq, int(2)),
+                ),
+                cmp(col("c"), CompareOp::Eq, int(3)),
+            ))
+        ))
+    );
+}
+
+#[test]
+fn une_parenthese_contient_une_expression_complete() {
+    // Une parenthèse repart du sommet de la grammaire : tout ce qu'accepte
+    // `expr` doit être accepté à l'intérieur.
+    assert_eq!(
+        parse("SELECT * FROM t WHERE (a = 1 AND b = 2)"),
+        Ok(select(
+            Selection::All,
+            "t",
+            Some(and(
+                cmp(col("a"), CompareOp::Eq, int(1)),
+                cmp(col("b"), CompareOp::Eq, int(2)),
+            ))
+        ))
+    );
+}
+
+// --- les deux côtés d'une comparaison sont des `primary` ---------------------
+
+#[test]
+fn une_comparaison_accepte_une_colonne_a_droite() {
+    // `comparison := primary ( op primary )?` — les deux côtés suivent la
+    // même règle. Comparer deux colonnes est syntaxiquement valide.
+    assert_eq!(
+        parse("SELECT * FROM t WHERE a = b"),
+        Ok(select(
+            Selection::All,
+            "t",
+            Some(cmp(col("a"), CompareOp::Eq, col("b")))
+        ))
+    );
+}
+
+#[test]
+fn une_comparaison_accepte_un_litteral_a_gauche() {
+    assert_eq!(
+        parse("SELECT * FROM t WHERE 1 = a"),
+        Ok(select(
+            Selection::All,
+            "t",
+            Some(cmp(int(1), CompareOp::Eq, col("a")))
+        ))
+    );
+}
+
 // --- une vraie requête ------------------------------------------------------
 
 #[test]
