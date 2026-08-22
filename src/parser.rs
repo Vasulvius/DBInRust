@@ -115,7 +115,7 @@
 //! dérivation à `Token`. Si ça arrive, le compilateur te dira laquelle et
 //! pourquoi — lis son message, il y a une décision de conception derrière.
 
-use std::{iter::Peekable, matches, println, vec::IntoIter};
+use std::{iter::Peekable, matches, vec::IntoIter};
 
 use crate::lexer::{Keyword, LexError, Token, tokenize};
 
@@ -454,16 +454,12 @@ impl Parser {
 
     fn compare_expr(&mut self) -> Result<Box<Expr>, ParseError> {
         if self.eat(Token::LParen) {
-            let mut expr = self.compare_expr();
-            if Some(&Token::Keyword(Keyword::Or)) == self.tokens.peek() {
-                expr = self.or_expr(Some(expr?));
-            }
+            let expr = self.parse_expression();
             self.expect(Token::RParen)?;
             return expr;
         }
 
-        let col = Expr::Column(self.ident()?);
-
+        let left: Box<Expr> = self.parse_primary()?;
         if matches!(
             self.tokens.peek(),
             Some(Token::Eq)
@@ -473,17 +469,21 @@ impl Parser {
                 | Some(Token::Gt)
                 | Some(Token::GtEq)
         ) {
-            let left = Box::new(col);
             let op = self.expect_compare_op()?;
-            let right: Box<Expr> = match self.next()? {
-                Token::Str(s) => Box::new(Expr::Literal(Value::Str(s))),
-                Token::Int(n) => Box::new(Expr::Literal(Value::Int(n))),
-                token => return Err(ParseError::UnexpectedToken(token)),
-            };
+            let right: Box<Expr> = self.parse_primary()?;
 
             Ok(Box::new(Expr::Compare { left, op, right }))
         } else {
-            Ok(Box::new(col))
+            Ok(left)
+        }
+    }
+
+    fn parse_primary(&mut self) -> Result<Box<Expr>, ParseError> {
+        match self.next()? {
+            Token::Ident(s) => Ok(Box::new(Expr::Column(s))),
+            Token::Str(s) => Ok(Box::new(Expr::Literal(Value::Str(s)))),
+            Token::Int(n) => Ok(Box::new(Expr::Literal(Value::Int(n)))),
+            token => return Err(ParseError::UnexpectedToken(token)),
         }
     }
 }
