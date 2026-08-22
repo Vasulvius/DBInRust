@@ -146,12 +146,11 @@ impl Parser {
     }
 
     fn parse_select(&mut self) -> Result<Statement, ParseError> {
-        let selection: Selection;
-        if self.eat(Token::Star) {
-            selection = Selection::All;
+        let selection = if self.eat(Token::Star) {
+            Selection::All
         } else {
-            selection = Selection::Columns(self.cook_columns()?);
-        }
+            Selection::Columns(self.cook_columns()?)
+        };
         self.expect(Token::Keyword(Keyword::From))?;
 
         let table = self.ident()?;
@@ -319,12 +318,6 @@ impl Parser {
     }
 
     fn compare_expr(&mut self) -> Result<Expr, ParseError> {
-        if self.eat(Token::LParen) {
-            let expr = self.parse_expression();
-            self.expect(Token::RParen)?;
-            return expr;
-        }
-
         let left = self.parse_primary()?;
         if matches!(
             self.tokens.peek(),
@@ -348,7 +341,12 @@ impl Parser {
             Token::Ident(s) => Ok(Expr::Column(s)),
             Token::Str(s) => Ok(Expr::Literal(Value::Str(s))),
             Token::Int(n) => Ok(Expr::Literal(Value::Int(n))),
-            token => return Err(ParseError::UnexpectedToken(token)),
+            Token::LParen => {
+                let expr = self.parse_expression();
+                self.expect(Token::RParen)?;
+                expr
+            }
+            token => Err(ParseError::UnexpectedToken(token)),
         }
     }
 }

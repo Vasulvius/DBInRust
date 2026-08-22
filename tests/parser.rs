@@ -434,6 +434,29 @@ fn une_comparaison_accepte_un_litteral_a_gauche() {
     );
 }
 
+#[test]
+fn une_parenthese_peut_entourer_un_operande() {
+    // `primary := ident | value | "(" expr ")"` — la parenthèse est l'une des
+    // formes de `primary`. Elle est donc acceptée partout où un opérande l'est,
+    // des deux côtés de l'opérateur, et pas seulement en tête d'expression.
+    assert_eq!(
+        parse("SELECT * FROM t WHERE a = (1)"),
+        Ok(select(
+            Selection::All,
+            "t",
+            Some(cmp(col("a"), CompareOp::Eq, int(1)))
+        ))
+    );
+    assert_eq!(
+        parse("SELECT * FROM t WHERE (a) = 1"),
+        Ok(select(
+            Selection::All,
+            "t",
+            Some(cmp(col("a"), CompareOp::Eq, int(1)))
+        ))
+    );
+}
+
 // --- une vraie requête ------------------------------------------------------
 
 #[test]
