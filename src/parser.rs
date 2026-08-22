@@ -234,8 +234,8 @@ impl Parser {
         self.expect(Token::Keyword(Keyword::Table))?;
         let table = self.ident()?;
         self.expect(Token::LParen)?;
-
         let columns = self.cook_columns_def()?;
+        self.expect(Token::RParen)?;
 
         Ok(Statement::CreateTable { table, columns })
     }
@@ -247,12 +247,13 @@ impl Parser {
         let mut columns: Option<Vec<String>> = None;
 
         if self.eat(Token::LParen) {
-            columns = Some(self.cook_columns_name()?);
+            columns = Some(self.cook_columns()?);
+            self.expect(Token::RParen)?;
         }
         self.expect(Token::Keyword(Keyword::Values))?;
         self.expect(Token::LParen)?;
-
         let values = self.cook_values()?;
+        self.expect(Token::RParen)?;
 
         Ok(Statement::Insert {
             table,
@@ -265,10 +266,10 @@ impl Parser {
         let selection: Selection;
         if self.eat(Token::Star) {
             selection = Selection::All;
-            self.expect(Token::Keyword(Keyword::From))?;
         } else {
-            selection = Selection::Columns(self.cook_select_columns_name()?);
+            selection = Selection::Columns(self.cook_columns()?);
         }
+        self.expect(Token::Keyword(Keyword::From))?;
 
         let table = self.ident()?;
 
@@ -343,33 +344,16 @@ impl Parser {
         }
     }
 
-    // TODO: factorize with cook_values and cook_columns_def
-    fn cook_columns_name(&mut self) -> Result<Vec<String>, ParseError> {
+    fn cook_columns(&mut self) -> Result<Vec<String>, ParseError> {
         let mut cooked: Vec<String> = Vec::new();
 
         loop {
             cooked.push(self.ident()?);
 
-            match self.next()? {
-                Token::Comma => continue,
-                Token::RParen => break,
-                token => return Err(ParseError::UnexpectedToken(token)),
-            }
-        }
-
-        Ok(cooked)
-    }
-
-    fn cook_select_columns_name(&mut self) -> Result<Vec<String>, ParseError> {
-        let mut cooked: Vec<String> = Vec::new();
-
-        loop {
-            cooked.push(self.ident()?);
-
-            match self.next()? {
-                Token::Comma => continue,
-                Token::Keyword(Keyword::From) => break,
-                token => return Err(ParseError::UnexpectedToken(token)),
+            if self.eat(Token::Comma) {
+                continue;
+            } else {
+                break;
             }
         }
 
@@ -388,10 +372,10 @@ impl Parser {
                 data_type: column_type,
             });
 
-            match self.next()? {
-                Token::Comma => continue,
-                Token::RParen => break,
-                token => return Err(ParseError::UnexpectedToken(token)),
+            if self.eat(Token::Comma) {
+                continue;
+            } else {
+                break;
             }
         }
 
@@ -404,10 +388,10 @@ impl Parser {
         loop {
             cooked.push(self.value()?);
 
-            match self.next()? {
-                Token::Comma => continue,
-                Token::RParen => break,
-                token => return Err(ParseError::UnexpectedToken(token)),
+            if self.eat(Token::Comma) {
+                continue;
+            } else {
+                break;
             }
         }
 
@@ -462,12 +446,7 @@ impl Parser {
         let left = self.parse_primary()?;
         if matches!(
             self.tokens.peek(),
-            Some(Token::Eq)
-                | Some(Token::NotEq)
-                | Some(Token::Lt)
-                | Some(Token::LtEq)
-                | Some(Token::Gt)
-                | Some(Token::GtEq)
+            Some(Token::Eq | Token::NotEq | Token::Lt | Token::LtEq | Token::Gt | Token::GtEq)
         ) {
             let op = self.expect_compare_op()?;
             let right = self.parse_primary()?;
