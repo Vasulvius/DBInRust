@@ -1,4 +1,4 @@
-use std::{iter::Peekable, matches, vec::IntoIter};
+use std::{iter::Peekable, vec::IntoIter};
 
 use crate::lexer::{Keyword, LexError, Token, tokenize};
 
@@ -103,11 +103,9 @@ impl Parser {
             Token::Keyword(Keyword::Select) => self.parse_select()?,
             token => return Err(ParseError::UnexpectedToken(token)),
         };
+
+        self.eat(Token::Semicolon);
         match self.tokens.next() {
-            Some(Token::Semicolon) => match self.tokens.next() {
-                Some(token) => Err(ParseError::UnexpectedToken(token)),
-                None => Ok(statement),
-            },
             Some(token) => Err(ParseError::UnexpectedToken(token)),
             None => Ok(statement),
         }
@@ -117,7 +115,7 @@ impl Parser {
         self.expect(Token::Keyword(Keyword::Table))?;
         let table = self.ident()?;
         self.expect(Token::LParen)?;
-        let columns = self.cook_columns_def()?;
+        let columns = self.parse_columns_def()?;
         self.expect(Token::RParen)?;
 
         Ok(Statement::CreateTable { table, columns })
@@ -127,15 +125,17 @@ impl Parser {
         self.expect(Token::Keyword(Keyword::Into))?;
         let table = self.ident()?;
 
-        let mut columns: Option<Vec<String>> = None;
-
-        if self.eat(Token::LParen) {
-            columns = Some(self.cook_columns()?);
+        let columns = if self.eat(Token::LParen) {
+            let columns = Some(self.parse_columns()?);
             self.expect(Token::RParen)?;
-        }
+            columns
+        } else {
+            None
+        };
+
         self.expect(Token::Keyword(Keyword::Values))?;
         self.expect(Token::LParen)?;
-        let values = self.cook_values()?;
+        let values = self.parse_values()?;
         self.expect(Token::RParen)?;
 
         Ok(Statement::Insert {
@@ -149,17 +149,17 @@ impl Parser {
         let selection = if self.eat(Token::Star) {
             Selection::All
         } else {
-            Selection::Columns(self.cook_columns()?)
+            Selection::Columns(self.parse_columns()?)
         };
         self.expect(Token::Keyword(Keyword::From))?;
 
         let table = self.ident()?;
 
-        let mut filter: Option<Expr> = None;
-
-        if self.eat(Token::Keyword(Keyword::Where)) {
-            filter = Some(self.parse_expression()?);
-        }
+        let filter = if self.eat(Token::Keyword(Keyword::Where)) {
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
 
         Ok(Statement::Select {
             selection,
@@ -182,18 +182,6 @@ impl Parser {
         }
     }
 
-    fn expect_compare_op(&mut self) -> Result<CompareOp, ParseError> {
-        match self.next()? {
-            Token::Eq => Ok(CompareOp::Eq),
-            Token::NotEq => Ok(CompareOp::NotEq),
-            Token::Lt => Ok(CompareOp::Lt),
-            Token::LtEq => Ok(CompareOp::LtEq),
-            Token::Gt => Ok(CompareOp::Gt),
-            Token::GtEq => Ok(CompareOp::GtEq),
-            token => Err(ParseError::UnexpectedToken(token)),
-        }
-    }
-
     fn eat(&mut self, expected: Token) -> bool {
         if Some(&expected) == self.tokens.peek() {
             self.tokens.next();
@@ -201,6 +189,22 @@ impl Parser {
         } else {
             false
         }
+    }
+
+    fn eat_compare_op(&mut self) -> Option<CompareOp> {
+        let res = match self.tokens.peek() {
+            Some(&Token::Eq) => Some(CompareOp::Eq),
+            Some(&Token::NotEq) => Some(CompareOp::NotEq),
+            Some(&Token::Lt) => Some(CompareOp::Lt),
+            Some(&Token::LtEq) => Some(CompareOp::LtEq),
+            Some(&Token::Gt) => Some(CompareOp::Gt),
+            Some(&Token::GtEq) => Some(CompareOp::GtEq),
+            _ => None,
+        };
+        if res.is_some() {
+            self.tokens.next();
+        }
+        res
     }
 
     fn ident(&mut self) -> Result<String, ParseError> {
@@ -226,15 +230,13 @@ impl Parser {
         }
     }
 
-    fn cook_columns(&mut self) -> Result<Vec<String>, ParseError> {
+    fn parse_columns(&mut self) -> Result<Vec<String>, ParseError> {
         let mut cooked: Vec<String> = Vec::new();
 
         loop {
             cooked.push(self.ident()?);
 
-            if self.eat(Token::Comma) {
-                continue;
-            } else {
+            if !self.eat(Token::Comma) {
                 break;
             }
         }
@@ -242,7 +244,7 @@ impl Parser {
         Ok(cooked)
     }
 
-    fn cook_columns_def(&mut self) -> Result<Vec<ColumnDef>, ParseError> {
+    fn parse_columns_def(&mut self) -> Result<Vec<ColumnDef>, ParseError> {
         let mut columns: Vec<ColumnDef> = Vec::new();
 
         loop {
@@ -254,9 +256,7 @@ impl Parser {
                 data_type: column_type,
             });
 
-            if self.eat(Token::Comma) {
-                continue;
-            } else {
+            if !self.eat(Token::Comma) {
                 break;
             }
         }
@@ -264,15 +264,13 @@ impl Parser {
         Ok(columns)
     }
 
-    fn cook_values(&mut self) -> Result<Vec<Value>, ParseError> {
+    fn parse_values(&mut self) -> Result<Vec<Value>, ParseError> {
         let mut cooked: Vec<Value> = Vec::new();
 
         loop {
             cooked.push(self.value()?);
 
-            if self.eat(Token::Comma) {
-                continue;
-            } else {
+            if !self.eat(Token::Comma) {
                 break;
             }
         }
@@ -282,58 +280,46 @@ impl Parser {
 
     // Parsing expressions
     fn parse_expression(&mut self) -> Result<Expr, ParseError> {
-        self.or_expr()
+        self.parse_or_expr()
     }
 
-    fn or_expr(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.and_expr()?;
+    fn parse_or_expr(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.parse_and_expr()?;
 
-        loop {
-            if self.eat(Token::Keyword(Keyword::Or)) {
-                let right = self.and_expr()?;
-                expr = Expr::Or(Box::new(expr), Box::new(right));
-                continue;
-            } else {
-                break;
-            }
+        while self.eat(Token::Keyword(Keyword::Or)) {
+            let right = self.parse_and_expr()?;
+            expr = Expr::Or(Box::new(expr), Box::new(right));
         }
 
         Ok(expr)
     }
 
-    fn and_expr(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.compare_expr()?;
+    fn parse_and_expr(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.parse_compare_expr()?;
 
-        loop {
-            if self.eat(Token::Keyword(Keyword::And)) {
-                let right = self.compare_expr()?;
-                expr = Expr::And(Box::new(expr), Box::new(right));
-                continue;
-            } else {
-                break;
-            }
+        while self.eat(Token::Keyword(Keyword::And)) {
+            let right = self.parse_compare_expr()?;
+            expr = Expr::And(Box::new(expr), Box::new(right));
         }
 
         Ok(expr)
     }
 
-    fn compare_expr(&mut self) -> Result<Expr, ParseError> {
+    fn parse_compare_expr(&mut self) -> Result<Expr, ParseError> {
         let left = self.parse_primary()?;
-        if matches!(
-            self.tokens.peek(),
-            Some(Token::Eq | Token::NotEq | Token::Lt | Token::LtEq | Token::Gt | Token::GtEq)
-        ) {
-            let op = self.expect_compare_op()?;
-            let right = self.parse_primary()?;
+        let expr = match self.eat_compare_op() {
+            Some(op) => {
+                let right = self.parse_primary()?;
+                Expr::Compare {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                }
+            }
+            _ => left,
+        };
 
-            Ok(Expr::Compare {
-                left: Box::new(left),
-                op,
-                right: Box::new(right),
-            })
-        } else {
-            Ok(left)
-        }
+        Ok(expr)
     }
 
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
