@@ -275,7 +275,7 @@ impl Parser {
         let mut filter: Option<Expr> = None;
 
         if self.eat(Token::Keyword(Keyword::Where)) {
-            filter = Some(*self.parse_expression()?);
+            filter = Some(self.parse_expression()?);
         }
 
         Ok(Statement::Select {
@@ -415,13 +415,13 @@ impl Parser {
     }
 
     // Parsing expressions
-    fn parse_expression(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn parse_expression(&mut self) -> Result<Expr, ParseError> {
         self.or_expr(None)
     }
 
-    fn or_expr(&mut self, left: Option<Box<Expr>>) -> Result<Box<Expr>, ParseError> {
+    fn or_expr(&mut self, left: Option<Expr>) -> Result<Expr, ParseError> {
         // Todo: factorise match case with and_expr ?
-        let mut expr: Box<Expr>;
+        let mut expr: Expr;
         match left {
             Some(left) => expr = left,
             None => expr = self.and_expr(None)?,
@@ -430,14 +430,14 @@ impl Parser {
         // Stop condition => cannot eat an OR token
         if self.eat(Token::Keyword(Keyword::Or)) {
             let right = self.and_expr(None)?;
-            expr = self.or_expr(Some(Box::new(Expr::Or(expr, right))))?;
+            expr = self.or_expr(Some(Expr::Or(Box::new(expr), Box::new(right))))?;
         }
 
         Ok(expr)
     }
 
-    fn and_expr(&mut self, left: Option<Box<Expr>>) -> Result<Box<Expr>, ParseError> {
-        let mut expr: Box<Expr>;
+    fn and_expr(&mut self, left: Option<Expr>) -> Result<Expr, ParseError> {
+        let mut expr: Expr;
         match left {
             Some(left) => expr = left,
             None => expr = self.compare_expr()?,
@@ -446,20 +446,20 @@ impl Parser {
         // Stop condition => cannot eat an AND token
         if self.eat(Token::Keyword(Keyword::And)) {
             let right = self.compare_expr()?;
-            expr = self.and_expr(Some(Box::new(Expr::And(expr, right))))?;
+            expr = self.and_expr(Some(Expr::And(Box::new(expr), Box::new(right))))?;
         }
 
         Ok(expr)
     }
 
-    fn compare_expr(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn compare_expr(&mut self) -> Result<Expr, ParseError> {
         if self.eat(Token::LParen) {
             let expr = self.parse_expression();
             self.expect(Token::RParen)?;
             return expr;
         }
 
-        let left: Box<Expr> = self.parse_primary()?;
+        let left = self.parse_primary()?;
         if matches!(
             self.tokens.peek(),
             Some(Token::Eq)
@@ -470,19 +470,23 @@ impl Parser {
                 | Some(Token::GtEq)
         ) {
             let op = self.expect_compare_op()?;
-            let right: Box<Expr> = self.parse_primary()?;
+            let right = self.parse_primary()?;
 
-            Ok(Box::new(Expr::Compare { left, op, right }))
+            Ok(Expr::Compare {
+                left: Box::new(left),
+                op,
+                right: Box::new(right),
+            })
         } else {
             Ok(left)
         }
     }
 
-    fn parse_primary(&mut self) -> Result<Box<Expr>, ParseError> {
+    fn parse_primary(&mut self) -> Result<Expr, ParseError> {
         match self.next()? {
-            Token::Ident(s) => Ok(Box::new(Expr::Column(s))),
-            Token::Str(s) => Ok(Box::new(Expr::Literal(Value::Str(s)))),
-            Token::Int(n) => Ok(Box::new(Expr::Literal(Value::Int(n)))),
+            Token::Ident(s) => Ok(Expr::Column(s)),
+            Token::Str(s) => Ok(Expr::Literal(Value::Str(s))),
+            Token::Int(n) => Ok(Expr::Literal(Value::Int(n))),
             token => return Err(ParseError::UnexpectedToken(token)),
         }
     }
