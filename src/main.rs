@@ -1,6 +1,12 @@
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    println,
+};
 
-use minidb::repl::{Input, MetaCommand, classify};
+use minidb::{
+    parser::parse,
+    repl::{Input, MetaCommand, classify},
+};
 
 const HELP: &str = "META COMMANDS
 .exit, .quit        quit the minidb cli
@@ -22,7 +28,10 @@ fn main() {
             Ok(0) => break,
             Ok(_) => match classify(&input) {
                 Input::Empty => (),
-                Input::Sql(query) => println!("{query}"),
+                Input::Sql(query) => match parse(&query) {
+                    Ok(sql) => println!("{:#?}", sql),
+                    Err(e) => eprintln!("{:#?}", e),
+                },
                 Input::Meta(MetaCommand::Exit) => break,
                 Input::Meta(MetaCommand::Help) => println!("{HELP}"),
                 Input::Meta(MetaCommand::Unknown(unknown_input)) => eprintln!(
