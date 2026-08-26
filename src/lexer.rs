@@ -1,4 +1,4 @@
-use std::{iter::Peekable, str::Chars};
+use std::{iter::Peekable, str::CharIndices};
 
 pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
     Lexer::new(src).tokenize()
@@ -61,45 +61,45 @@ pub enum Token {
 
 #[derive(Debug, PartialEq)]
 pub enum LexError {
-    UnexpectedChar(char),
-    UnterminatedString,
-    NumberOutOfRange(String),
+    UnexpectedChar { ch: char, at: usize },
+    UnterminatedString { at: usize },
+    NumberOutOfRange { text: String, at: usize },
 }
 
 struct Lexer<'a> {
-    chars: Peekable<Chars<'a>>,
+    chars: Peekable<CharIndices<'a>>,
 }
 
 impl<'a> Lexer<'a> {
     fn new(src: &'a str) -> Self {
         Lexer {
-            chars: src.chars().peekable(),
+            chars: src.char_indices().peekable(),
         }
     }
 
     fn tokenize(&mut self) -> Result<Vec<Token>, LexError> {
         let mut tokens: Vec<Token> = Vec::new();
-        while let Some(&c) = self.chars.peek() {
+        while let Some(&(pos, c)) = self.chars.peek() {
             match c {
                 _ if c.is_ascii_whitespace() => {
                     self.chars.next();
                 }
-                _ if c.is_ascii_digit() => tokens.push(self.tokenize_number()?),
+                _ if c.is_ascii_digit() => tokens.push(self.tokenize_number(pos)?),
                 _ if c.is_ascii_alphabetic() || c == '_' => {
                     tokens.push(self.tokenize_ident_or_keyword())
                 }
-                '\'' => tokens.push(self.tokenize_string()?),
-                _ => tokens.push(self.tokenize_symbol(c)?),
+                '\'' => tokens.push(self.tokenize_string(pos)?),
+                _ => tokens.push(self.tokenize_symbol(c, pos)?),
             }
         }
         Ok(tokens)
     }
 
-    fn tokenize_number(&mut self) -> Result<Token, LexError> {
+    fn tokenize_number(&mut self, pos: usize) -> Result<Token, LexError> {
         let nb = self.take_while(|c| c.is_ascii_digit());
         match nb.parse::<i64>() {
             Ok(parsed_nb) => Ok(Token::Int(parsed_nb)),
-            Err(_) => Err(LexError::NumberOutOfRange(nb)),
+            Err(_) => Err(LexError::NumberOutOfRange { text: nb, at: pos }),
         }
     }
 
@@ -113,7 +113,7 @@ impl<'a> Lexer<'a> {
 
     fn take_while(&mut self, pred: impl Fn(char) -> bool) -> String {
         let mut expression = String::new();
-        while let Some(&c) = self.chars.peek() {
+        while let Some(&(_, c)) = self.chars.peek() {
             if pred(c) {
                 expression.push(c);
                 self.chars.next();
@@ -124,10 +124,10 @@ impl<'a> Lexer<'a> {
         expression
     }
 
-    fn tokenize_string(&mut self) -> Result<Token, LexError> {
+    fn tokenize_string(&mut self, pos: usize) -> Result<Token, LexError> {
         let mut str_data = String::new();
         self.chars.next();
-        while let Some(c) = self.chars.next() {
+        while let Some((_, c)) = self.chars.next() {
             if c == '\'' {
                 if self.eat('\'') {
                     str_data.push('\'');
@@ -138,10 +138,10 @@ impl<'a> Lexer<'a> {
                 str_data.push(c);
             }
         }
-        Err(LexError::UnterminatedString)
+        Err(LexError::UnterminatedString { at: pos })
     }
 
-    fn tokenize_symbol(&mut self, c: char) -> Result<Token, LexError> {
+    fn tokenize_symbol(&mut self, c: char, pos: usize) -> Result<Token, LexError> {
         self.chars.next();
         match c {
             '=' => Ok(Token::Eq),
@@ -154,7 +154,7 @@ impl<'a> Lexer<'a> {
                 if self.eat('=') {
                     Ok(Token::NotEq)
                 } else {
-                    Err(LexError::UnexpectedChar('!'))
+                    Err(LexError::UnexpectedChar { ch: '!', at: pos })
                 }
             }
             '<' => {
@@ -173,16 +173,21 @@ impl<'a> Lexer<'a> {
                     Ok(Token::Gt)
                 }
             }
-            _ => Err(LexError::UnexpectedChar(c)),
+            _ => Err(LexError::UnexpectedChar { ch: c, at: pos }),
         }
     }
 
     fn eat(&mut self, expected: char) -> bool {
-        if Some(&expected) == self.chars.peek() {
-            self.chars.next();
-            true
-        } else {
-            false
+        match self.chars.peek() {
+            Some(&(_, c)) => {
+                if c == expected {
+                    self.chars.next();
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
         }
     }
 }

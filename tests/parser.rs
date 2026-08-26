@@ -540,10 +540,10 @@ fn du_texte_en_trop_apres_le_statement_est_une_erreur() {
 fn une_erreur_du_lexer_remonte_telle_quelle() {
     assert_eq!(
         parse("SELECT # FROM t"),
-        Err(ParseError::Lex(LexError::UnexpectedChar('#')))
+        Err(ParseError::Lex(LexError::UnexpectedChar { ch: '#', at: 7 }))
     );
     assert_eq!(
         parse("SELECT * FROM t WHERE name = 'bob"),
-        Err(ParseError::Lex(LexError::UnterminatedString))
+        Err(ParseError::Lex(LexError::UnterminatedString { at: 29 }))
     );
 }

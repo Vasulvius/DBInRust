@@ -100,9 +100,10 @@ fn les_entiers_sont_convertis() {
 fn un_entier_trop_grand_est_une_erreur() {
     assert_eq!(
         tokenize("99999999999999999999"),
-        Err(LexError::NumberOutOfRange(
-            "99999999999999999999".to_string()
-        ))
+        Err(LexError::NumberOutOfRange {
+            text: "99999999999999999999".to_string(),
+            at: 0
+        })
     );
 }
 
@@ -131,9 +132,15 @@ fn le_contenu_dune_chaine_nest_jamais_interprete() {
 
 #[test]
 fn une_chaine_non_fermee_est_une_erreur() {
-    assert_eq!(tokenize("'abc"), Err(LexError::UnterminatedString));
+    assert_eq!(
+        tokenize("'abc"),
+        Err(LexError::UnterminatedString { at: 0 })
+    );
     // Ici le `''` est un échappement : la chaîne continue, puis le texte finit.
-    assert_eq!(tokenize("'a''"), Err(LexError::UnterminatedString));
+    assert_eq!(
+        tokenize("'a''"),
+        Err(LexError::UnterminatedString { at: 0 })
+    );
 }
 
 // --- ponctuation ------------------------------------------------------------
@@ -179,17 +186,29 @@ fn un_operateur_peut_terminer_lentree() {
 fn un_caractere_inconnu_est_une_erreur() {
     assert_eq!(
         tokenize("select # from t"),
-        Err(LexError::UnexpectedChar('#'))
+        Err(LexError::UnexpectedChar { ch: '#', at: 7 })
     );
 }
 
 #[test]
 fn un_point_dexclamation_seul_est_une_erreur() {
-    assert_eq!(tokenize("a ! b"), Err(LexError::UnexpectedChar('!')));
-    assert_eq!(tokenize("!x"), Err(LexError::UnexpectedChar('!')));
+    assert_eq!(
+        tokenize("a ! b"),
+        Err(LexError::UnexpectedChar { ch: '!', at: 2 })
+    );
+    assert_eq!(
+        tokenize("!x"),
+        Err(LexError::UnexpectedChar { ch: '!', at: 0 })
+    );
     // Un `!` en toute fin d'entrée : il n'y a pas de `=` derrière non plus.
-    assert_eq!(tokenize("!"), Err(LexError::UnexpectedChar('!')));
-    assert_eq!(tokenize("a !"), Err(LexError::UnexpectedChar('!')));
+    assert_eq!(
+        tokenize("!"),
+        Err(LexError::UnexpectedChar { ch: '!', at: 0 })
+    );
+    assert_eq!(
+        tokenize("a !"),
+        Err(LexError::UnexpectedChar { ch: '!', at: 2 })
+    );
 }
 
 // --- requêtes complètes -----------------------------------------------------

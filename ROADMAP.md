@@ -76,7 +76,10 @@ transactions et journal, index secondaires, jointures.
       `Option` d'accumulateur) trahit une répétition écrite en récursion, et un
       chemin d'erreur mort trahit une fonction qui répond pour un cas que son
       appelant a déjà écarté.
-- [ ] **Étape 4 — Erreurs** ← à venir
+- [ ] **Étape 4 — Erreurs** ← en cours
+      Spec et tests dans `tests/errors.rs` (15 cas). `Display` sur `Keyword`,
+      `Token`, `LexError` et `ParseError` ; `std::error::Error` avec `source()`
+      sur les deux erreurs ; positions en octets dans `LexError`.
 
 ## Dettes assumées
 
@@ -85,7 +88,8 @@ plutôt que de sur-concevoir maintenant.
 
 | Quoi                                            | Prévu pour |
 |-------------------------------------------------|------------|
-| Positions dans le source pour les erreurs        | étape 4    |
+| Positions dans les erreurs du **parser**         | plus tard  |
+| Affichage humain d'une erreur (extrait + curseur)| plus tard  |
 | Nombres négatifs, flottants, commentaires `--`   | au besoin  |
 | Identifiants entre guillemets (`"ma table"`)     | au besoin  |
 | Arguments de méta-commandes (`.exit 0`)          | au besoin  |
