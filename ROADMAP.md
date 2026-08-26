@@ -76,10 +76,19 @@ transactions et journal, index secondaires, jointures.
       `Option` d'accumulateur) trahit une répétition écrite en récursion, et un
       chemin d'erreur mort trahit une fonction qui répond pour un cas que son
       appelant a déjà écarté.
-- [ ] **Étape 4 — Erreurs** ← en cours
-      Spec et tests dans `tests/errors.rs` (15 cas). `Display` sur `Keyword`,
-      `Token`, `LexError` et `ParseError` ; `std::error::Error` avec `source()`
-      sur les deux erreurs ; positions en octets dans `LexError`.
+- [x] **Étape 4 — Erreurs**
+      `Display` sur `Keyword`, `Token`, `LexError` et `ParseError` ;
+      `std::error::Error` sur les deux erreurs, avec `source()` qui expose la
+      cause ; positions en octets dans `LexError`. Le REPL affiche désormais
+      `unterminated string starting at position 33` au lieu d'un `{:?}`.
+      Au passage : premiers traits écrits à la main plutôt que dérivés,
+      `Display` (humain) vs `Debug` (programmeur) comme choix de conception,
+      `ToString` **dérivé** de `Display` et jamais l'inverse — l'appeler depuis
+      `fmt` fait déborder la pile —, et `Box<dyn Error>` que `?` sait viser
+      tout seul dès qu'`Error` est implémenté.
+      La leçon annoncée depuis l'étape 2 a coûté 70 erreurs de compilation :
+      voilà le prix d'un type d'erreur enrichi après coup.
+- [ ] **Étape 5 — Exécution en mémoire** ← à venir
 
 ## Dettes assumées
 

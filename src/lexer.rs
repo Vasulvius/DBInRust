@@ -240,13 +240,9 @@ impl<'a> Lexer<'a> {
 
     fn eat(&mut self, expected: char) -> bool {
         match self.chars.peek() {
-            Some(&(_, c)) => {
-                if c == expected {
-                    self.chars.next();
-                    true
-                } else {
-                    false
-                }
+            Some(&(_, c)) if c == expected => {
+                self.chars.next();
+                true
             }
             _ => false,
         }
