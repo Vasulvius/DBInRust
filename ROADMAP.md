@@ -34,12 +34,12 @@ git commit
 | 2  | Tokenizer            | SQL brut → `Vec<Token>`                                 | itérateurs, `Peekable`, découpage de `&str`       |
 | 3  | Parser               | tokens → arbre syntaxique                               | descente récursive, `Box<T>`, `Result` et `?`     |
 | 4  | Erreurs              | un type d'erreur unifié pour tout le moteur             | `Display`, `From`, `std::error::Error`            |
-| 5  | Exécution en mémoire | `CREATE TABLE` / `INSERT` / `SELECT` en RAM             | `HashMap`, traits, premières vraies lifetimes     |
-| 6  | Sérialisation        | une ligne ↔ une suite d'octets                          | `&[u8]`, `to_le_bytes`, découpage de slices       |
-| 7  | Pager                | le fichier vu comme des pages de 4 Ko, avec cache       | `File`, `Seek`, ownership qui commence à piquer   |
-| 8  | B-tree, feuilles     | nœud feuille, recherche binaire, éclatement             | indices plutôt que références                     |
-| 9  | B-tree, arbre        | nœuds internes, arbre multi-niveaux                     | récursion sous contrainte du borrow checker       |
-| 10 | `WHERE`              | évaluation d'expressions                                | pattern matching en profondeur                    |
+| 5  | Exécution en mémoire | `CREATE TABLE` / `INSERT` / `SELECT` en RAM             | `HashMap`, `Default`, itérateurs sur deux niveaux |
+| 6  | `WHERE`              | évaluation d'expressions sur une ligne                  | pattern matching en profondeur, récursion          |
+| 7  | Sérialisation        | une ligne ↔ une suite d'octets                          | `&[u8]`, `to_le_bytes`, découpage de slices       |
+| 8  | Pager                | le fichier vu comme des pages de 4 Ko, avec cache       | `File`, `Seek`, ownership qui commence à piquer   |
+| 9  | B-tree, feuilles     | nœud feuille, recherche binaire, éclatement             | indices plutôt que références                     |
+| 10 | B-tree, arbre        | nœuds internes, arbre multi-niveaux                     | récursion sous contrainte du borrow checker       |
 
 Ensuite, au choix : machine virtuelle à bytecode (comme le vrai SQLite),
 transactions et journal, index secondaires, jointures.
@@ -88,7 +88,9 @@ transactions et journal, index secondaires, jointures.
       tout seul dès qu'`Error` est implémenté.
       La leçon annoncée depuis l'étape 2 a coûté 70 erreurs de compilation :
       voilà le prix d'un type d'erreur enrichi après coup.
-- [ ] **Étape 5 — Exécution en mémoire** ← à venir
+- [ ] **Étape 5 — Exécution en mémoire** ← en cours
+      Spec dans `src/exec.rs`, tests dans `tests/exec.rs` (32 cas).
+      `Database::execute(sql) -> Result<Output, DbError>`.
 
 ## Dettes assumées
 
