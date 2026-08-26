@@ -1,3 +1,4 @@
+use std::fmt;
 use std::{iter::Peekable, vec::IntoIter};
 
 use crate::lexer::{Keyword, LexError, Token, tokenize};
@@ -77,6 +78,25 @@ pub enum ParseError {
     UnexpectedToken(Token),
     UnexpectedEnd,
     Lex(LexError),
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ParseError::UnexpectedToken(token) => write!(f, "unexpected token: {}", token),
+            ParseError::UnexpectedEnd => write!(f, "unexpected end of input"),
+            ParseError::Lex(lex_error) => write!(f, "{}", lex_error),
+        }
+    }
+}
+
+impl std::error::Error for ParseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ParseError::Lex(lex_error) => Some(lex_error),
+            _ => None,
+        }
+    }
 }
 
 impl From<LexError> for ParseError {

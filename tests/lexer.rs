@@ -1,8 +1,3 @@
-//! Étape 2 — tests d'acceptation du tokenizer.
-//!
-//! Ce fichier est la spécification exécutable de l'étape. Tu ne le modifies
-//! pas : tu écris `src/lexer.rs` jusqu'à ce que `cargo test` soit vert.
-
 use minidb::lexer::Token::*;
 use minidb::lexer::{Keyword as Kw, LexError, Token, tokenize};
 

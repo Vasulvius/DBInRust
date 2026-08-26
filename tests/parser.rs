@@ -1,8 +1,3 @@
-//! Étape 3 — tests d'acceptation du parser.
-//!
-//! Ce fichier est la spécification exécutable de l'étape. Tu ne le modifies
-//! pas : tu écris `src/parser.rs` jusqu'à ce que `cargo test` soit vert.
-
 use minidb::lexer::{Keyword, LexError, Token};
 use minidb::parser::{
     ColumnDef, CompareOp, DataType, Expr, ParseError, Selection, Statement, Value, parse,

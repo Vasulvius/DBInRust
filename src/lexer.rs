@@ -1,4 +1,4 @@
-use std::{iter::Peekable, str::CharIndices};
+use std::{fmt, iter::Peekable, str::CharIndices};
 
 pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
     Lexer::new(src).tokenize()
@@ -18,6 +18,27 @@ pub enum Keyword {
     Or,
     Integer,
     Text,
+}
+
+impl fmt::Display for Keyword {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let text = match self {
+            Keyword::Select => "SELECT",
+            Keyword::From => "FROM",
+            Keyword::Where => "WHERE",
+            Keyword::Insert => "INSERT",
+            Keyword::Into => "INTO",
+            Keyword::Values => "VALUES",
+            Keyword::Create => "CREATE",
+            Keyword::Table => "TABLE",
+            Keyword::And => "AND",
+            Keyword::Or => "OR",
+            Keyword::Integer => "INTEGER",
+            Keyword::Text => "TEXT",
+        };
+
+        f.write_str(text)
+    }
 }
 
 impl Keyword {
@@ -59,12 +80,52 @@ pub enum Token {
     GtEq,
 }
 
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::Keyword(keyword) => write!(f, "{keyword}"),
+            Token::Ident(string) => write!(f, "{string}"),
+            Token::Int(int) => write!(f, "{int}"),
+            Token::Str(string) => write!(f, "'{string}'"),
+            Token::Comma => f.write_str(","),
+            Token::Semicolon => f.write_str(";"),
+            Token::LParen => f.write_str("("),
+            Token::RParen => f.write_str(")"),
+            Token::Star => f.write_str("*"),
+            Token::Eq => f.write_str("="),
+            Token::NotEq => f.write_str("!="),
+            Token::Lt => f.write_str("<"),
+            Token::LtEq => f.write_str("<="),
+            Token::Gt => f.write_str(">"),
+            Token::GtEq => f.write_str(">="),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum LexError {
     UnexpectedChar { ch: char, at: usize },
     UnterminatedString { at: usize },
     NumberOutOfRange { text: String, at: usize },
 }
+
+impl fmt::Display for LexError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LexError::UnexpectedChar { ch, at } => {
+                write!(f, "unexpected character '{}' at position {}", ch, at)
+            }
+            LexError::UnterminatedString { at } => {
+                write!(f, "unterminated string starting at position {}", at)
+            }
+            LexError::NumberOutOfRange { text, at } => {
+                write!(f, "number out of range at position {}: {}", at, text)
+            }
+        }
+    }
+}
+
+impl std::error::Error for LexError {}
 
 struct Lexer<'a> {
     chars: Peekable<CharIndices<'a>>,

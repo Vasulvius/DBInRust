@@ -30,7 +30,7 @@ fn main() {
                 Input::Empty => (),
                 Input::Sql(query) => match parse(&query) {
                     Ok(sql) => println!("{:#?}", sql),
-                    Err(e) => eprintln!("{:#?}", e),
+                    Err(e) => eprintln!("{}", e),
                 },
                 Input::Meta(MetaCommand::Exit) => break,
                 Input::Meta(MetaCommand::Help) => println!("{HELP}"),
